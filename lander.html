@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lander</title>
+</head>
+<body>
+    <canvas id="canvas" height="900", width="1600"></canvas>
+    <script>
+        let canvas=document.querySelector("#canvas");
+        let ctx=canvas.getContext('2d');
+        ctx.strokeStyle="black";
+        ctx.fillStyle="gray";
+        ctx.font = '48px sans-serif';
+        let grounds=[
+            [0, canvas.height*(Math.random()*0.1+0.9)]
+        ];
+        // create ground
+        while(true){
+            let next_x=grounds.at(-1)[0]+1+Math.random()*200;
+            if(next_x>=canvas.width){
+                next_x=canvas.width;
+            }
+            let next_y=canvas.height*(Math.random()*0.1+0.9);
+            grounds.push([next_x, next_y]);
+            if(next_x==canvas.width){
+                break;
+            }
+        }
+        // controls
+        let left_key=false; right_key=false;
+        document.addEventListener("keydown", e=>{
+            if(e.key=="ArrowLeft"||e.key=="a"){
+                left_key=true;
+            }
+            if(e.key=="ArrowRight"||e.key=="d"){
+                right_key=true;
+            }
+            if(e.key==" "||e.key=="Escape"){
+                location.reload();
+            }
+        });
+        document.addEventListener("keyup", e=>{
+            if(e.key=="ArrowLeft"||e.key=="a"){
+                left_key=false;
+            }
+            if(e.key=="ArrowRight"||e.key=="d"){
+                right_key=false;
+            }
+        });
+        // lander init
+        let lander={
+            x: 0,
+            y: 100,
+            w: 30,
+            h: 40,
+            vx: 1,
+            vy: 0,
+            t: Math.random()*2*Math.PI,
+            vt: 1e-2,
+            g: 1e-3,
+            ft: 1e-4,
+            fy: 5e-3,
+            fuel: 1,
+            fc: 2e-3
+        };
+        function finish(landed=false){
+            let success=landed;
+            let fail_messages=[]
+            if(!landed){
+                fail_messages.push("× 範囲外");
+            }else{
+                if(Math.abs(lander.vx)>0.3){
+                    fail_messages.push("× 水平速度");
+                    success=false;
+                }
+                if(lander.vy>0.3){
+                    fail_messages.push("× 降下速度");
+                    success=false;
+                }
+                if(Math.abs(lander.t)>Math.PI/4&&Math.abs(lander.t)<Math.PI/4*7){
+                    fail_messages.push("× 機体角度");
+                    success=false;
+                }
+                if(Math.abs(lander.vt)>1e-2){
+                    fail_messages.push("× 回転速度");
+                    success=false;
+                }
+                let prev_ground=null;
+                for(ground of grounds){
+                    if(prev_ground!=null){
+                        if(lander.x>=prev_ground[0]&&lander.x<ground[0]){
+                            let ground_angle=Math.abs(Math.atan2(ground[1]-prev_ground[1], ground[0]-prev_ground[0])-lander.t)%(2*Math.PI);
+                            if(ground_angle>Math.PI/8&&ground_angle<Math.PI/8*15){
+                                fail_messages.push("× 対地角度");
+                                success=false;
+                            }
+                            break;
+                        }
+                    }
+                    prev_ground=ground;
+                }
+            }
+            fail_messages.forEach((v, i)=>{
+                ctx.fillText(v, 0, (i+2)*50);
+            });
+            if(success){
+                ctx.fillText("燃料残: "+(Math.max(lander.fuel, 0)*100).toFixed(1)+"%", 0, 100);
+                ctx.fillStyle="rgba(0, 255, 0, .5)"
+            }else{
+                ctx.fillStyle="rgba(255, 0, 0, .5)"
+            }
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+        }
+        function render(){
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            // move lander
+            if(lander.fuel>0&&left_key){
+                lander.vt+=lander.ft;
+                lander.vx+=Math.sin(lander.t)*lander.fy;
+                lander.vy-=Math.cos(lander.t)*lander.fy;
+                lander.fuel-=lander.fc;
+            }
+            if(lander.fuel>0&&right_key){
+                lander.vt-=lander.ft;
+                lander.vx+=Math.sin(lander.t)*lander.fy;
+                lander.vy-=Math.cos(lander.t)*lander.fy;
+                lander.fuel-=lander.fc;
+            }
+            lander.vy+=lander.g;
+            lander.x+=lander.vx;
+            lander.y+=lander.vy;
+            lander.t+=lander.vt;
+            lander.t%=2*Math.PI;
+            // render langer
+            ctx.translate(lander.x, lander.y);
+            ctx.rotate(lander.t);
+            ctx.strokeRect(-lander.w/2, -lander.h/2, lander.w, lander.h);
+            ctx.beginPath();
+            ctx.lineTo(-lander.w/2, -lander.h/2);
+            ctx.lineTo(0, -lander.h);
+            ctx.lineTo(lander.w/2, -lander.h/2);
+            ctx.closePath();
+            ctx.stroke();
+            if(lander.fuel>0){
+                ctx.fillRect(-lander.w/2, (0.5-lander.fuel)*lander.h, lander.w, lander.fuel*lander.h);
+                if(left_key){
+                    ctx.beginPath();
+                    ctx.lineTo(-lander.w/2, lander.h/2);
+                    ctx.lineTo(-lander.w/4*3, lander.h/4*3);
+                    ctx.lineTo(-lander.w/4*1, lander.h/4*3);
+                    ctx.closePath();
+                    ctx.stroke();
+                }
+                if(right_key){
+                    ctx.beginPath();
+                    ctx.lineTo(lander.w/2, lander.h/2);
+                    ctx.lineTo(lander.w/4*3, lander.h/4*3);
+                    ctx.lineTo(lander.w/4*1, lander.h/4*3);
+                    ctx.closePath();
+                    ctx.stroke();
+                }
+            }
+            ctx.resetTransform();
+            // render ground and detect land
+            let landed=false, prev_ground=null;
+            ctx.beginPath();
+            for(ground of grounds){
+                ctx.lineTo(ground[0], ground[1]);
+                if(prev_ground!=null){
+                    if(lander.x>=prev_ground[0]&&lander.x<ground[0]){
+                        if((ground[1]-prev_ground[1])/(ground[0]-prev_ground[0])*(lander.x-prev_ground[0])<=lander.y+lander.h/2-prev_ground[1]){
+                            landed=true;
+                        }
+                    }
+                }
+                prev_ground=ground;
+            }
+            ctx.stroke();
+            // render time
+            ctx.fillText(((new Date()-start)/1000).toFixed(2), 0, 50);
+            // finish or next loop
+            if(lander.x<0||lander.x>canvas.width||lander.y<0||lander.y>canvas.height){
+                finish()
+            }else if(landed){
+                finish(true);
+            }else{
+                window.requestAnimationFrame(render);
+            }
+        }
+        let start=new Date();
+        window.requestAnimationFrame(render);
+    </script>
+</body>
+</html>
